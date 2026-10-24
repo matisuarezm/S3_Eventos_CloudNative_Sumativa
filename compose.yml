@@ -13,6 +13,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JAVA_OPTS: "-XX:MaxRAMPercentage=75"
     mem_limit: 450m
+    volumes:
+      - ./wallet:/app/wallet:ro   # <-- nuevo: wallet de Oracle (solo lectura)
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
       interval: 15s
@@ -33,6 +35,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JAVA_OPTS: "-XX:MaxRAMPercentage=75"
     mem_limit: 450m
+    volumes:
+      - ./wallet:/app/wallet:ro   # <-- nuevo: wallet de Oracle (solo lectura)
     depends_on:
       eventos-service:
         condition: service_healthy
