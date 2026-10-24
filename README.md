@@ -1,5 +1,7 @@
 # Eventos Cloud Native – Semana 1 (CDY2204)
 
+## Cinthya Guzman / Matias Suarez
+
 Sistema de **registro de eventos y venta de entradas**, construido con dos microservicios Spring Boot,
 persistencia en **Oracle Cloud (Autonomous Database)** y despliegue continuo con
 **GitHub Actions → Docker Hub → AWS EC2**.
