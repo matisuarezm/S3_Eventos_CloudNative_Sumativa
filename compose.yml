@@ -1,0 +1,44 @@
+# Despliegue de los dos microservicios en la instancia EC2.
+# Las variables (${...}) se leen del archivo .env que el pipeline crea en la EC2.
+services:
+  eventos-service:
+    image: ${DOCKERHUB_USERNAME}/eventos-service:${IMAGE_TAG:-latest}
+    container_name: eventos-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75"
+    mem_limit: 450m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  ventas-service:
+    image: ${DOCKERHUB_USERNAME}/ventas-service:${IMAGE_TAG:-latest}
+    container_name: ventas-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      EVENTOS_URL: http://eventos-service:8081
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75"
+    mem_limit: 450m
+    depends_on:
+      eventos-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s

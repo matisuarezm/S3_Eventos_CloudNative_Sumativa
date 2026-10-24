@@ -1,0 +1,510 @@
+{
+  "info": {
+    "name": "Eventos Cloud Native - Semana 1",
+    "description": "Pruebas de eventos-service y ventas-service. Cambia la variable 'host' por la IP elastica de tu EC2 (o localhost).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "host",
+      "value": "localhost"
+    },
+    {
+      "key": "eventosUrl",
+      "value": "http://{{host}}:8081"
+    },
+    {
+      "key": "ventasUrl",
+      "value": "http://{{host}}:8082"
+    },
+    {
+      "key": "eventoId",
+      "value": "1"
+    },
+    {
+      "key": "compraId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Eventos (eventos-service :8081)",
+      "item": [
+        {
+          "name": "1. Listar eventos disponibles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{eventosUrl}}/api/eventos",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "api",
+                "eventos"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cada evento tiene nombre, fecha y precio', () => {",
+                  "  pm.response.json().forEach(e => { pm.expect(e).to.have.property('nombre'); pm.expect(e).to.have.property('fecha'); pm.expect(e).to.have.property('precioEntrada'); });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Crear evento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{eventosUrl}}/api/eventos",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "api",
+                "eventos"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Lollapalooza Chile 2027\",\n  \"descripcion\": \"Festival de musica - dia 1\",\n  \"lugar\": \"Parque Cerrillos, Santiago\",\n  \"fecha\": \"2027-03-20T14:00:00\",\n  \"precioEntrada\": 95000,\n  \"capacidad\": 1000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const e = pm.response.json();",
+                  "pm.collectionVariables.set('eventoId', e.id);",
+                  "pm.test('Entradas disponibles = capacidad', () => pm.expect(e.entradasDisponibles).to.eql(e.capacidad));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Obtener evento por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{eventosUrl}}/api/eventos/{{eventoId}}",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "api",
+                "eventos",
+                "{{eventoId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Listar todos los eventos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{eventosUrl}}/api/eventos?todos=true",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "api",
+                "eventos"
+              ],
+              "query": [
+                {
+                  "key": "todos",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "5. Crear evento invalido (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{eventosUrl}}/api/eventos",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "api",
+                "eventos"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"\",\n  \"lugar\": \"Santiago\",\n  \"fecha\": \"2020-01-01T10:00:00\",\n  \"precioEntrada\": 0,\n  \"capacidad\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Evento inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{eventosUrl}}/api/eventos/999999",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "api",
+                "eventos",
+                "999999"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Compras (ventas-service :8082)",
+      "item": [
+        {
+          "name": "1. Comprar entradas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventoId\": {{eventoId}},\n  \"cantidad\": 3,\n  \"nombreCliente\": \"Camila Rojas\",\n  \"emailCliente\": \"camila.rojas@correo.cl\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "pm.collectionVariables.set('compraId', c.idCompra);",
+                  "pm.test('Total = precio unitario x cantidad', () => pm.expect(c.precioTotal).to.eql(c.precioUnitario * c.cantidadEntradas));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Listar compras",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Obtener compra por id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Comprar mas entradas de las disponibles (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras"
+              ]
+            },
+            "description": "Para ver el 409, crea antes un evento con capacidad 5 y usa su id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventoId\": {{eventoId}},\n  \"cantidad\": 10,\n  \"nombreCliente\": \"Prueba Sin Cupos\",\n  \"emailCliente\": \"prueba@correo.cl\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5. Comprar evento inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventoId\": 999999,\n  \"cantidad\": 1,\n  \"nombreCliente\": \"Juan Perez\",\n  \"emailCliente\": \"juan@correo.cl\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Compra invalida (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventoId\": 1,\n  \"cantidad\": 0,\n  \"nombreCliente\": \"\",\n  \"emailCliente\": \"no-es-un-email\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health checks",
+      "item": [
+        {
+          "name": "eventos-service health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{eventosUrl}}/actuator/health",
+              "host": [
+                "{{eventosUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "ventas-service health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/actuator/health",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

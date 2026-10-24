@@ -1,0 +1,23 @@
+# Compilacion Maven
+**/target/
+
+# Bases H2 locales
+**/data/
+*.mv.db
+*.trace.db
+
+# Secretos: NUNCA subir a GitHub
+.env
+*.pem
+*.key
+wallet/
+Wallet_*.zip
+*credenciales*
+*llaves*
+
+# IDEs y sistema
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
