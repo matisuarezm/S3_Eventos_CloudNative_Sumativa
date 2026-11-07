@@ -33,10 +33,19 @@ services:
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      # Semana 2: Amazon S3 para los resumenes de compra
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN}
+      # Semana 3: carpeta donde el contenedor ve el EFS (almacenamiento temporal de tickets)
+      EFS_PATH: /app/efs
       JAVA_OPTS: "-XX:MaxRAMPercentage=75"
     mem_limit: 450m
     volumes:
-      - ./wallet:/app/wallet:ro   # <-- nuevo: wallet de Oracle (solo lectura)
+      - ./wallet:/app/wallet:ro   # wallet de Oracle (solo lectura)
+      - /mnt/efs:/app/efs         # Semana 3: EFS montado en la EC2 -> /app/efs en el contenedor
     depends_on:
       eventos-service:
         condition: service_healthy

@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Eventos Cloud Native - Semana 1",
+    "name": "Eventos Cloud Native - Semanas 1, 2 y 3",
     "description": "Pruebas de eventos-service y ventas-service. Cambia la variable 'host' por la IP elastica de tu EC2 (o localhost).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -24,6 +24,14 @@
     {
       "key": "compraId",
       "value": "1"
+    },
+    {
+      "key": "ticketId",
+      "value": "1"
+    },
+    {
+      "key": "usuario",
+      "value": "camila.rojas@correo.cl"
     }
   ],
   "item": [
@@ -462,6 +470,719 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Resumen de compra - Semana 2 (ventas-service :8082 + S3)",
+      "item": [
+        {
+          "name": "1. Generar resumen PDF (descarga directa)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen"
+              ]
+            },
+            "description": "Genera el PDF del resumen. En Postman: Send and Download / Save response to file."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Es un PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Subir resumen a S3",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen",
+                "s3"
+              ]
+            },
+            "description": "Genera el PDF y lo sube a s3://bucket/resumenes/{id}/resumen-compra-{id}.pdf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Carpeta = numero de compra', () => pm.expect(pm.response.json().key).to.include('resumenes/' + pm.collectionVariables.get('compraId') + '/'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Descargar resumen desde S3",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen",
+                "s3"
+              ]
+            },
+            "description": "Descarga el PDF guardado en S3 (Send and Download)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4a. Corregir datos del cliente",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}"
+              ]
+            },
+            "description": "Corrige nombre/email del cliente en la BD.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreCliente\": \"Camila Rojas Perez\",\n  \"emailCliente\": \"camila.rojas@correo.cl\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4b. Modificar resumen en S3 (regenerar)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen",
+                "s3"
+              ]
+            },
+            "description": "Sin archivo: regenera el PDF con los datos actuales de la compra y reemplaza el de S3."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4c. Modificar resumen en S3 (subir PDF corregido)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen",
+                "s3"
+              ]
+            },
+            "description": "Con archivo: Body form-data, key 'archivo' tipo File, seleccionar un PDF.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "archivo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Eliminar resumen de S3",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen",
+                "s3"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Eliminar resumen inexistente (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/resumen/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "resumen",
+                "s3"
+              ]
+            },
+            "description": "Ejecutar despues del paso 5: el archivo ya no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tickets - Semana 3 (EFS + S3)",
+      "item": [
+        {
+          "name": "1. Generar tickets (EFS -> S3 automatico)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/tickets",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "tickets"
+              ]
+            },
+            "description": "Genera 1 PDF por entrada en EFS y los sube a S3 en tickets/evento-{id}/{usuario}/ticket-{n}.pdf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const t = pm.response.json(); pm.collectionVariables.set('ticketId', t[0].id);",
+                  "pm.collectionVariables.set('eventoId', t[0].eventoId); pm.collectionVariables.set('usuario', t[0].usuario);",
+                  "pm.test('Ruta por evento y usuario', () => pm.expect(t[0].rutaArchivo).to.match(/^tickets\\/evento-\\d+\\/.+\\/ticket-\\d+\\.pdf$/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1b. Generar tickets solo en EFS (sin subir)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/compras/{{compraId}}/tickets?subirAutomaticamente=false",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "compras",
+                "{{compraId}}",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "subirAutomaticamente",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Para la demo: los PDF quedan en /mnt/efs/tickets/... (verlo con ls en la EC2). Usar otra compra que no tenga tickets."
+          }
+        },
+        {
+          "name": "2. Subir un ticket a S3",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/{{ticketId}}/s3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "{{ticketId}}",
+                "s3"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2b. Subir pendientes (todos los que estan en EFS)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/s3/pendientes",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "s3",
+                "pendientes"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "3. Historial por evento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets?eventoId={{eventoId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "eventoId",
+                  "value": "{{eventoId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3b. Historial por usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets?usuario={{usuario}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "usuario",
+                  "value": "{{usuario}}"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "3c. Historial por estado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets?estado=SUBIDO_S3",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets"
+              ],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "SUBIDO_S3"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "4. Descargar un ticket (PDF)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/{{ticketId}}/pdf",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "{{ticketId}}",
+                "pdf"
+              ]
+            },
+            "description": "Send and Download"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4b. Descargar tickets de un evento (ZIP)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/descargar?eventoId={{eventoId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "descargar"
+              ],
+              "query": [
+                {
+                  "key": "eventoId",
+                  "value": "{{eventoId}}"
+                }
+              ]
+            },
+            "description": "Send and Download"
+          }
+        },
+        {
+          "name": "4c. Descargar tickets de un usuario (ZIP)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/descargar?usuario={{usuario}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "descargar"
+              ],
+              "query": [
+                {
+                  "key": "usuario",
+                  "value": "{{usuario}}"
+                }
+              ]
+            },
+            "description": "Send and Download"
+          }
+        },
+        {
+          "name": "5. Modificar detalles del ticket",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/{{ticketId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "{{ticketId}}"
+              ]
+            },
+            "description": "Regenera el PDF y lo sobrescribe en S3 (misma ruta)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreAsistente\": \"Pedro Soto\",\n  \"sector\": \"VIP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Eliminar ticket",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/{{ticketId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "{{ticketId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6b. Eliminar ticket inexistente (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/tickets/{{ticketId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "tickets",
+                "{{ticketId}}"
+              ]
+            },
+            "description": "Ejecutar despues del 6"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Estadisticas de todos los eventos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/estadisticas/eventos",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "estadisticas",
+                "eventos"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7b. Estadisticas de un evento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ventasUrl}}/api/estadisticas/eventos/{{eventoId}}",
+              "host": [
+                "{{ventasUrl}}"
+              ],
+              "path": [
+                "api",
+                "estadisticas",
+                "eventos",
+                "{{eventoId}}"
+              ]
+            },
+            "description": ""
+          }
         }
       ]
     },

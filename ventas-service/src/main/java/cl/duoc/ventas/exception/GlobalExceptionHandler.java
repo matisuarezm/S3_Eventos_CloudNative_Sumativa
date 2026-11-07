@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -39,6 +40,35 @@ public class GlobalExceptionHandler {
         log.warn(ex.getMessage());
         return respuesta(HttpStatus.SERVICE_UNAVAILABLE,
                 "El servicio de eventos no esta disponible, intente nuevamente", null);
+    }
+
+    // Semana 3: tickets ya generados -> 409
+    @ExceptionHandler(ConflictoException.class)
+    public ResponseEntity<Map<String, Object>> conflicto(ConflictoException ex) {
+        return respuesta(HttpStatus.CONFLICT, ex.getMessage(), null);
+    }
+
+    // Semana 3: filtros faltantes o ruta invalida -> 400
+    @ExceptionHandler(SolicitudInvalidaException.class)
+    public ResponseEntity<Map<String, Object>> solicitudInvalida(SolicitudInvalidaException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(ArchivoInvalidoException.class)
+    public ResponseEntity<Map<String, Object>> archivoInvalido(ArchivoInvalidoException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> archivoMuyGrande(MaxUploadSizeExceededException ex) {
+        return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo no puede superar 5 MB", null);
+    }
+
+    @ExceptionHandler(AlmacenamientoException.class)
+    public ResponseEntity<Map<String, Object>> errorS3(AlmacenamientoException ex) {
+        log.error(ex.getMessage());
+        // Aplica a S3 (credenciales vencidas, bucket) y a EFS (no montado, sin permisos)
+        return respuesta(HttpStatus.BAD_GATEWAY, ex.getMessage(), null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -1,11 +1,14 @@
 package cl.duoc.ventas.client;
 
 import cl.duoc.ventas.dto.EventoDto;
+import cl.duoc.ventas.dto.EventoInfoDto;
 import cl.duoc.ventas.exception.EntradasInsuficientesException;
 import cl.duoc.ventas.exception.RecursoNoEncontradoException;
 import cl.duoc.ventas.exception.ServicioNoDisponibleException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,6 +28,8 @@ import java.util.Map;
  */
 @Component
 public class EventosClient {
+
+    private static final Logger log = LoggerFactory.getLogger(EventosClient.class);
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -62,6 +67,22 @@ public class EventosClient {
         } catch (RestClientResponseException ex) {
             throw new ServicioNoDisponibleException(
                     "eventos-service respondio con error " + ex.getStatusCode().value());
+        }
+    }
+
+    /**
+     * Semana 3: consulta capacidad y entradas disponibles de un evento (para las estadisticas).
+     * Si eventos-service no responde, devuelve null: las estadisticas igual se muestran, sin esos datos.
+     */
+    public EventoInfoDto obtenerEvento(Long eventoId) {
+        try {
+            return restClient.get()
+                    .uri("/api/eventos/{id}", eventoId)
+                    .retrieve()
+                    .body(EventoInfoDto.class);
+        } catch (Exception ex) {
+            log.warn("No se pudo consultar el evento {} en eventos-service: {}", eventoId, ex.getMessage());
+            return null;
         }
     }
 

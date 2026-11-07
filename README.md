@@ -1,4 +1,4 @@
-# Eventos Cloud Native – Semana 1 (CDY2204)
+# Eventos Cloud Native – Semanas 1, 2 y 3 (CDY2204)
 
 ## Cinthya Guzman / Matias Suarez
 
@@ -116,6 +116,137 @@ Respuesta `201 Created`:
 
 ---
 
+## Semana 3 – Tickets con Amazon EFS + Amazon S3
+
+Sistema de gestión de reservas con **tickets personalizados**: por cada entrada de una compra se genera un
+ticket PDF. El PDF se escribe primero en **Amazon EFS** (almacenamiento temporal compartido, montado en la EC2)
+y luego se sube a **Amazon S3** (almacenamiento definitivo), organizado **por evento y por usuario**.
+
+```
+POST /api/compras/{id}/tickets
+        │
+        ▼
+ventas-service ── TicketPdfService (1 PDF por entrada)
+        │
+        ▼
+ EFS  /app/efs/tickets/evento-5/camila_correo.cl/ticket-12.pdf      (temporal)
+        │   AlmacenamientoS3Service.subir(...)
+        ▼
+ S3   s3://<bucket>/tickets/evento-5/camila_correo.cl/ticket-12.pdf  (definitivo)
+        │
+        └── se borra el temporal de EFS; la tabla TICKETS guarda estado e historial
+```
+
+| Estado del ticket | Dónde está el PDF |
+|---|---|
+| `GENERADO_EFS` | Solo en EFS (se generó sin subida automática, o S3 falló) |
+| `SUBIDO_S3` | En S3 (ya se borró de EFS) |
+
+### Endpoints (ventas-service, `http://<host>:8082`)
+
+| Método | Ruta | Requisito |
+|---|---|---|
+| POST   | `/api/compras/{id}/tickets` | **Generar tickets** (EFS) y subirlos automáticamente a S3. `?subirAutomaticamente=false` los deja solo en EFS |
+| POST   | `/api/tickets/{id}/s3` | **Subir** un ticket a S3 |
+| POST   | `/api/tickets/s3/pendientes` | Subir todos los tickets que siguen en EFS (opcional `?eventoId=`) |
+| GET    | `/api/tickets?eventoId=&usuario=&estado=` | **Historial** de archivos generados con filtros |
+| GET    | `/api/tickets/{id}` | Detalle de un ticket |
+| GET    | `/api/tickets/{id}/pdf` | **Descargar** un ticket |
+| GET    | `/api/tickets/descargar?eventoId=` / `?usuario=` | **Descargar por evento o por usuario** (ZIP con carpetas) |
+| PUT    | `/api/tickets/{id}` | **Modificar** detalles (`nombreAsistente`, `sector`); sobrescribe el PDF en S3 |
+| DELETE | `/api/tickets/{id}` | **Eliminar** un ticket (S3 + EFS + registro) |
+| GET    | `/api/estadisticas/eventos` | **Estadísticas** de ventas y reservas por evento |
+| GET    | `/api/estadisticas/eventos/{eventoId}` | Estadísticas de un evento |
+
+Ejemplo de estadísticas:
+
+```json
+{
+  "eventoId": 1, "evento": "Concierto Rock en el Parque",
+  "comprasRealizadas": 4, "entradasVendidas": 9, "recaudacionTotal": 225000,
+  "ticketsGenerados": 9, "ticketsEnEfs": 0, "ticketsEnS3": 9,
+  "capacidad": 500, "entradasDisponibles": 491, "porcentajeOcupacion": 1.8
+}
+```
+
+### Clases nuevas (ventas-service)
+
+| Clase | Responsabilidad |
+|---|---|
+| `model/Ticket`, `model/EstadoTicket` | Tabla `TICKETS`: datos del ticket, ruta del archivo, estado y fechas (historial) |
+| `repository/TicketRepository` | Búsqueda con filtros opcionales y conteo por evento/estado |
+| `service/AlmacenamientoEfsService` | Lee/escribe/borra archivos en la carpeta del EFS (`java.nio.file.Files`) |
+| `service/TicketPdfService` | Arma el PDF del ticket (OpenPDF) |
+| `service/TicketService` | Flujo EFS → S3, historial, ZIP, modificar, eliminar |
+| `service/EstadisticaService` | Ventas por evento (`GROUP BY` en BD) + tickets + capacidad desde eventos-service |
+| `controller/TicketController`, `controller/EstadisticaController` | Endpoints |
+
+## Semana 2 – Resumen de compra en Amazon S3
+
+El resumen de cada compra se genera como **archivo PDF** y se administra en un bucket de **Amazon S3**.
+Cada resumen se guarda en una **carpeta con el número de la compra**:
+
+```
+s3://<bucket>/
+└── resumenes/
+    ├── 1/
+    │   └── resumen-compra-1.pdf
+    ├── 2/
+    │   └── resumen-compra-2.pdf
+    └── ...
+```
+
+### Endpoints (ventas-service, `http://<host>:8082`)
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET    | `/api/compras/{id}/resumen`    | Genera el PDF del resumen y lo descarga (archivo físico) |
+| POST   | `/api/compras/{id}/resumen/s3` | Genera el PDF y lo **sube** a `resumenes/{id}/` en S3 |
+| GET    | `/api/compras/{id}/resumen/s3` | **Descarga** el PDF guardado en S3 |
+| PUT    | `/api/compras/{id}/resumen/s3` | **Modifica** el PDF en S3: sin archivo lo regenera con los datos actuales; con `archivo` (form-data, PDF) lo reemplaza |
+| DELETE | `/api/compras/{id}/resumen/s3` | **Elimina** el PDF de S3 (404 si no existe) |
+| PUT    | `/api/compras/{id}`            | Corrige nombre y email del cliente (luego se regenera el resumen con PUT …/resumen/s3) |
+
+Flujo para corregir un resumen con error:
+
+1. `PUT /api/compras/{id}` con el nombre/email correcto.
+2. `PUT /api/compras/{id}/resumen/s3` (sin archivo) → el PDF en S3 se regenera con los datos corregidos.
+
+Respuesta de las operaciones en S3:
+
+```json
+{
+  "idCompra": 1,
+  "bucket": "mibucketduocs3msuarez",
+  "key": "resumenes/1/resumen-compra-1.pdf",
+  "tamanoBytes": 1843,
+  "mensaje": "Resumen subido a S3"
+}
+```
+
+| Código | Cuándo |
+|---|---|
+| 404 | La compra no existe, o el resumen no está en S3 (descargar/modificar/eliminar) |
+| 400 | El archivo enviado para reemplazar no es PDF |
+| 413 | El archivo supera 5 MB |
+| 502 | Error al comunicarse con S3 (credenciales vencidas, bucket incorrecto) |
+
+### Clases nuevas (ventas-service)
+
+| Clase | Responsabilidad |
+|---|---|
+| `config/S3Config` | Crea el `S3Client` (AWS SDK v2) con las credenciales temporales del Learner Lab |
+| `service/ResumenPdfService` | Arma el PDF del resumen (OpenPDF) |
+| `service/AlmacenamientoS3Service` | Única clase que habla con S3: subir, descargar, existe, eliminar |
+| `service/ResumenCompraService` | Lógica del caso: define la carpeta, valida existencia, coordina PDF + S3 |
+| `controller/ResumenCompraController` | Expone los endpoints `/api/compras/{id}/resumen…` |
+
+### Configuración de S3
+
+- Bucket en `us-east-1` con **todo el acceso público bloqueado**: la aplicación accede con credenciales, no necesita acceso público.
+- Variables de entorno de ventas-service: `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`.
+- ⚠️ Las credenciales del Learner Lab **vencen al cerrar la sesión**: al iniciar una nueva, actualizar los 3 secrets `AWS_*` en GitHub y volver a ejecutar el workflow (*Re-run all jobs*).
+
 ## Puesta en marcha (paso a paso)
 
 ### 1. Base de datos Oracle Cloud
@@ -167,6 +298,30 @@ docker compose version
 > Recomendado: una instancia `t3.small` (2 GB). Con `t2.micro`/`t3.micro` (1 GB) corre igual,
 > pero conviene agregar swap: `sudo dd if=/dev/zero of=/swapfile bs=1M count=1024 && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`
 
+### 3b. Amazon EFS (Semana 3)
+
+1. Consola AWS → **EFS** → **Crear sistema de archivos** → nombre `efs-eventos`, VPC por defecto → **Crear**.
+2. En el EFS → pestaña **Red** → **Administrar**: en cada zona de disponibilidad asigna el **grupo de seguridad de la EC2** → Guardar.
+3. En el grupo de seguridad de la EC2 agrega la regla de entrada **NFS (TCP 2049)** con origen **el mismo grupo de seguridad**
+   (así la EC2 puede hablar con el EFS).
+4. En la EC2:
+
+```bash
+sudo mkdir -p /mnt/efs
+# Comando "Adjuntar" -> "Mediante el cliente NFS" del EFS, cambiando el destino a /mnt/efs:
+sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport \
+  fs-XXXXXXXX.efs.us-east-1.amazonaws.com:/ /mnt/efs
+df -h | grep efs
+
+# Montaje permanente (sobrevive a reinicios): agregar esta línea a /etc/fstab
+#   fs-XXXXXXXX.efs.us-east-1.amazonaws.com:/ /mnt/efs nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0
+sudo nano /etc/fstab
+sudo mount -a
+```
+
+El pipeline verifica que `/mnt/efs` esté montado y crea `/mnt/efs/tickets` con dueño UID 1000
+(el usuario sin privilegios del contenedor).
+
 ### 4. Secrets en GitHub
 
 En el repositorio: **Settings → Secrets and variables → Actions → New repository secret**
@@ -181,6 +336,10 @@ En el repositorio: **Settings → Secrets and variables → Actions → New repo
 | `DB_URL` | la URL JDBC del paso 1 |
 | `DB_USERNAME` | usuario de Oracle (`ADMIN`) |
 | `DB_PASSWORD` | contraseña de Oracle |
+| `S3_BUCKET` | nombre del bucket (Semana 2) |
+| `AWS_ACCESS_KEY_ID` | Learner Lab → AWS Details (Semana 2) |
+| `AWS_SECRET_ACCESS_KEY` | Learner Lab → AWS Details (Semana 2) |
+| `AWS_SESSION_TOKEN` | Learner Lab → AWS Details (Semana 2) |
 
 ### 5. Desplegar
 

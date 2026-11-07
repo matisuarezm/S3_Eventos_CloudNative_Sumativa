@@ -1,6 +1,7 @@
 package cl.duoc.ventas.service;
 
 import cl.duoc.ventas.client.EventosClient;
+import cl.duoc.ventas.dto.ActualizarClienteRequest;
 import cl.duoc.ventas.dto.CompraRequest;
 import cl.duoc.ventas.dto.CompraResponse;
 import cl.duoc.ventas.dto.EventoDto;
@@ -64,8 +65,22 @@ public class CompraService {
 
     @Transactional(readOnly = true)
     public CompraResponse obtener(Long id) {
+        return CompraResponse.desde(buscarEntidad(id));
+    }
+
+    /** Devuelve la entidad Compra (la usa el resumen PDF) o lanza 404 si no existe. */
+    @Transactional(readOnly = true)
+    public Compra buscarEntidad(Long id) {
         return repository.findById(id)
-                .map(CompraResponse::desde)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No existe la compra con id " + id));
+    }
+
+    /** Semana 2: corrige los datos del cliente de una compra (para luego regenerar su resumen). */
+    @Transactional
+    public CompraResponse actualizarCliente(Long id, ActualizarClienteRequest request) {
+        Compra compra = buscarEntidad(id);
+        compra.setNombreCliente(request.nombreCliente().trim());
+        compra.setEmailCliente(request.emailCliente().trim().toLowerCase());
+        return CompraResponse.desde(repository.save(compra));
     }
 }
